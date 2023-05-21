@@ -3,6 +3,12 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/twist.hpp"
+
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+
 #include "nav_msgs/msg/odometry.hpp"
 #include "irobot_create_msgs/action/undock.hpp"
 
@@ -28,12 +34,24 @@ private:
 
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
 
-  void goal_pose_callback(const geometry_msgs::msg::PoseStamped & msg) const;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr points_pub_;
 
-  void odom_callback(const nav_msgs::msg::Odometry & msg) const;
+  double kp_;
+
+  rclcpp::Time prev_time;
+
+  geometry_msgs::msg::Pose goal_pose_;
+  bool goal_reached;
+
+  void goal_pose_callback(const geometry_msgs::msg::PoseStamped& msg);
+
+  void odom_callback(const nav_msgs::msg::Odometry& msg);
 
   void send_goal_undock();
+
+  geometry_msgs::msg::Twist compute_twist(geometry_msgs::msg::Pose, rclcpp::Time time);
 };
 
 }  // namespace create3_state_machine
