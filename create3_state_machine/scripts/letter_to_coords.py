@@ -7,14 +7,14 @@ def svg_path_to_coordinates(svg_path):
     for path in paths:
         for segment in path:
             if type(segment) == Line:
+                coordinates.append(-segment.start.imag)
                 coordinates.append(segment.start.real)
-                coordinates.append(segment.start.imag)
+                coordinates.append(-segment.end.imag)
                 coordinates.append(segment.end.real)
-                coordinates.append(segment.end.imag)
 
     return coordinates
 
-svg_path = 's.svg'
+svg_path = 'e.svg'
 
 coordinates = svg_path_to_coordinates(svg_path)
 

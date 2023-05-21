@@ -1,32 +1,27 @@
 #include "create3_state_machine/Create3StateMachine.hpp"
+#include "create3_state_machine/letters.hpp"
 
 namespace create3_state_machine
 {
-Create3StateMachine::Create3StateMachine(const std::string& name) : Node(name), goal_reached(true), kp_(1.5)
+Create3StateMachine::Create3StateMachine(const std::string& name)
+  : Node(name), goal_reached(true), kp_(1.5), current_state_(State::IDLE)
 {
   this->undock_client_ptr_ = rclcpp_action::create_client<UndockAction>(this, "undock");
+  this->dock_client_ptr_ = rclcpp_action::create_client<DockAction>(this, "dock");
 
   goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-      "/goal_pose", 10, std::bind(&Create3StateMachine::goal_pose_callback, this, std::placeholders::_1));
+      "/goal_pose", 10, std::bind(&Create3StateMachine::goal_pose_callback, this, _1));
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "/odom", 10, std::bind(&Create3StateMachine::odom_callback, this, std::placeholders::_1));
+      "/odom", 10, std::bind(&Create3StateMachine::odom_callback, this, _1));
 
   twist_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
   points_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/points_test", 10);
 
-  word_srv_ = this->create_service<create3_state_machine_msgs::srv::String>("input_word", std::bind(&Create3StateMachine::word_srv_callback, this, std::placeholders::_1,  std::placeholders::_2));
+  word_srv_ = this->create_service<create3_state_machine_msgs::srv::String>(
+      "input_word", std::bind(&Create3StateMachine::word_srv_callback, this, _1, _2));
 
-  // for(int i = 0; i < 6; ++i){
-  //   geometry_msgs::msg::PoseStamped msg;
-  //   msg.header.frame_id = "odom";
-  //   msg.pose.position.x = poses[i*2] * 0.005;
-  //   msg.pose.position.y = poses[i*2 + 1] * 0.005;
-  //   msg.pose.orientation.w = 1;
-  //   points_pub_->publish(msg);
-
-  //   rclcpp::sleep_for(std::chrono::seconds(2));
-  // }
+  timer_state_machine_ = create_wall_timer(std::chrono::seconds(1), [this]() { state_machine(); });
 }
 
 Create3StateMachine::~Create3StateMachine() = default;
@@ -35,10 +30,19 @@ void Create3StateMachine::word_srv_callback(
     const std::shared_ptr<create3_state_machine_msgs::srv::String::Request> request,
     std::shared_ptr<create3_state_machine_msgs::srv::String::Response> response)
 {
-  if(request->word == "S"){
+  bool letter_exists = true;
+  for (char& letter : request->word)
+  {
+    letter_exists &= (letter == 'S' || letter == 'E') ? true : false;
+  }
+  if (letter_exists)
+  {
     response->result = "Executing...";
-    send_goal_undock();
-  }else{
+    word_to_draw_ = request->word;
+    current_state_ = State::UNDOCK;
+  }
+  else
+  {
     response->result = "Sadly requested letters are not implemented. Available: S";
   }
 }
@@ -54,38 +58,40 @@ void Create3StateMachine::odom_callback(const nav_msgs::msg::Odometry& msg)
   if (!goal_reached)
   {
     geometry_msgs::msg::Twist twist_msg;
-    twist_msg = compute_twist(msg.pose.pose, this->now());
+    twist_msg = compute_twist(msg.pose.pose);
     twist_pub_->publish(twist_msg);
   }
 }
 
-geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg::Pose curr_pose, rclcpp::Time time)
+geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg::Pose curr_pose)
 {
-  std::vector<double> poses = { 630.0, 567.0, 567.0, 630.0, 567.0, 630.0, 472.0, 662.0, 472.0, 662.0, 346.0,
-                                662.0, 346.0, 662.0, 252.0, 630.0, 252.0, 630.0, 189.0, 567.0, 189.0, 567.0,
-                                189.0, 504.0, 189.0, 504.0, 220.0, 441.0, 220.0, 441.0, 252.0, 410.0, 252.0,
-                                410.0, 315.0, 378.0, 315.0, 378.0, 504.0, 315.0, 504.0, 315.0, 567.0, 284.0,
-                                567.0, 284.0, 598.0, 252.0, 598.0, 252.0, 630.0, 189.0, 630.0, 189.0, 630.0,
-                                94.5,  630.0, 94.5,  567.0, 31.5,  567.0, 31.5,  472.0, 0.0,   472.0, 0.0,
-                                346.0, 0.0,   346.0, 0.0,   252.0, 31.5,  252.0, 31.5,  189.0, 94.5 };
+  double dx, dy, distance;
 
-  std::map<char, std::vector<double>> my_map;
-
-  my_map['S'] = poses;
-
-  double dx = my_map['S'][iter * 2] * 0.005 - curr_pose.position.x;
-  double dy = my_map['S'][iter * 2 + 1] * 0.005 - curr_pose.position.y;
-  double distance = std::hypot(dx, dy);
+  if (curr_letter == '!')
+  {
+    dx = letters[curr_letter][iter * 2] - curr_pose.position.x;
+    dy = letters[curr_letter][iter * 2 + 1] - curr_pose.position.y;
+    distance = std::hypot(dx, dy);
+  }
+  else
+  {
+    dx = letters[curr_letter][iter * 2] * 0.001 - 2 - curr_pose.position.x;
+    dy = letters[curr_letter][iter * 2 + 1] * 0.001 - curr_pose.position.y;
+    distance = std::hypot(dx, dy);
+  }
 
   if (distance < 0.1)
   {
     ++iter;
-    if (iter >= 38)
+    if (iter >= letters[curr_letter].size() / 2)
     {
       geometry_msgs::msg::Twist cmd_vel;
       cmd_vel.linear.x = 0.0;
       cmd_vel.angular.z = 0.0;
       goal_reached = true;
+      iter = 0;
+      current_state_ = (current_state_ == State::NEXT_LETTER_WAIT) ? State::NEXT_LETTER : State::DOCK;
+      return cmd_vel;
     }
   }
 
@@ -125,9 +131,99 @@ void Create3StateMachine::send_goal_undock()
   }
 
   auto undock_options = rclcpp_action::Client<UndockAction>::SendGoalOptions();
+  undock_options.result_callback = std::bind(&Create3StateMachine::result_undock_callback, this, _1);
   auto undock_msg = UndockAction::Goal();
 
   this->undock_client_ptr_->async_send_goal(undock_msg, undock_options);
 }
 
+void Create3StateMachine::send_goal_dock()
+{
+  if (!this->dock_client_ptr_->wait_for_action_server())
+  {
+    RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
+    rclcpp::shutdown();
+  }
+
+  auto dock_options = rclcpp_action::Client<DockAction>::SendGoalOptions();
+  dock_options.result_callback = std::bind(&Create3StateMachine::result_dock_callback, this, _1);
+  auto dock_msg = DockAction::Goal();
+
+  this->dock_client_ptr_->async_send_goal(dock_msg, dock_options);
+}
+
+void Create3StateMachine::result_undock_callback(const rclcpp_action::ClientGoalHandle<UndockAction>::WrappedResult& result)
+{
+  switch (result.code)
+  {
+    case rclcpp_action::ResultCode::SUCCEEDED:
+      RCLCPP_INFO(this->get_logger(), "Undocked!");
+      current_state_ = State::NEXT_LETTER;
+      break;
+    default:
+      RCLCPP_ERROR(this->get_logger(), "Undocking Failed...");
+      return;
+  }
+}
+
+void Create3StateMachine::result_dock_callback(const rclcpp_action::ClientGoalHandle<DockAction>::WrappedResult& result)
+{
+  switch (result.code)
+  {
+    case rclcpp_action::ResultCode::SUCCEEDED:
+      RCLCPP_INFO(this->get_logger(), "Docked!");
+      current_state_ = State::IDLE;
+      break;
+    default:
+      RCLCPP_ERROR(this->get_logger(), "Undocking Failed...");
+      return;
+  }
+}
+
+void Create3StateMachine::state_machine()
+{
+  switch (current_state_)
+  {
+    case State::UNDOCK:
+      send_goal_undock();
+      current_state_ = State::UNDOCK_WAIT;
+      break;
+    case State::UNDOCK_WAIT:
+      RCLCPP_INFO_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "Waiting for undock to finish");
+      break;
+    case State::DOCK:
+      RCLCPP_INFO_STREAM(this->get_logger(), "Docking....");
+      send_goal_dock();
+      current_state_ = State::DOCK_WAIT;
+      break;
+    case State::DOCK_WAIT:
+      RCLCPP_INFO_STREAM(this->get_logger(), "Docking....");
+      break;
+    case State::GO_TO_DOCK:
+      RCLCPP_INFO_STREAM(this->get_logger(), "Going to dock....");
+      curr_letter = '!';
+      goal_reached = false;
+      current_state_ = State::DOCK;
+      break;
+    case State::NEXT_LETTER_WAIT:
+      RCLCPP_INFO_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 4000, "Waiting for letter to finish");
+      break;
+    case State::NEXT_LETTER:
+      if (word_iter_ == word_to_draw_.size())
+        current_state_ = State::GO_TO_DOCK;
+      else
+      {
+        RCLCPP_INFO_STREAM(this->get_logger(), "Writing next letter....");
+        goal_reached = false;
+        curr_letter = word_to_draw_[word_iter_];
+        ++word_iter_;
+        current_state_ = State::NEXT_LETTER_WAIT;
+      }
+      break;
+
+    default:
+      break;
+  }
+
+}  // namespace create3_state_machine
 }  // namespace create3_state_machine
