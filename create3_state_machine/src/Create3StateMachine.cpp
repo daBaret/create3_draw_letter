@@ -15,6 +15,8 @@ Create3StateMachine::Create3StateMachine(const std::string& name) : Node(name), 
 
   points_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/points_test", 10);
 
+  word_srv_ = this->create_service<create3_state_machine_msgs::srv::String>("input_word", std::bind(&Create3StateMachine::word_srv_callback, this, std::placeholders::_1,  std::placeholders::_2));
+
   // for(int i = 0; i < 6; ++i){
   //   geometry_msgs::msg::PoseStamped msg;
   //   msg.header.frame_id = "odom";
@@ -25,11 +27,21 @@ Create3StateMachine::Create3StateMachine(const std::string& name) : Node(name), 
 
   //   rclcpp::sleep_for(std::chrono::seconds(2));
   // }
-
-  send_goal_undock();
 }
 
 Create3StateMachine::~Create3StateMachine() = default;
+
+void Create3StateMachine::word_srv_callback(
+    const std::shared_ptr<create3_state_machine_msgs::srv::String::Request> request,
+    std::shared_ptr<create3_state_machine_msgs::srv::String::Response> response)
+{
+  if(request->word == "S"){
+    response->result = "Executing...";
+    send_goal_undock();
+  }else{
+    response->result = "Sadly requested letters are not implemented. Available: S";
+  }
+}
 
 void Create3StateMachine::goal_pose_callback(const geometry_msgs::msg::PoseStamped& msg)
 {
@@ -49,9 +61,20 @@ void Create3StateMachine::odom_callback(const nav_msgs::msg::Odometry& msg)
 
 geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg::Pose curr_pose, rclcpp::Time time)
 {
-  double poses[] = {630.0, 567.0, 567.0, 630.0, 567.0, 630.0, 472.0, 662.0, 472.0, 662.0, 346.0, 662.0, 346.0, 662.0, 252.0, 630.0, 252.0, 630.0, 189.0, 567.0, 189.0, 567.0, 189.0, 504.0, 189.0, 504.0, 220.0, 441.0, 220.0, 441.0, 252.0, 410.0, 252.0, 410.0, 315.0, 378.0, 315.0, 378.0, 504.0, 315.0, 504.0, 315.0, 567.0, 284.0, 567.0, 284.0, 598.0, 252.0, 598.0, 252.0, 630.0, 189.0, 630.0, 189.0, 630.0, 94.5, 630.0, 94.5, 567.0, 31.5, 567.0, 31.5, 472.0, 0.0, 472.0, 0.0, 346.0, 0.0, 346.0, 0.0, 252.0, 31.5, 252.0, 31.5, 189.0, 94.5};
-  double dx = poses[iter * 2] * 0.005 - curr_pose.position.x;
-  double dy = poses[iter * 2 + 1] * 0.005  - curr_pose.position.y;
+  std::vector<double> poses = { 630.0, 567.0, 567.0, 630.0, 567.0, 630.0, 472.0, 662.0, 472.0, 662.0, 346.0,
+                                662.0, 346.0, 662.0, 252.0, 630.0, 252.0, 630.0, 189.0, 567.0, 189.0, 567.0,
+                                189.0, 504.0, 189.0, 504.0, 220.0, 441.0, 220.0, 441.0, 252.0, 410.0, 252.0,
+                                410.0, 315.0, 378.0, 315.0, 378.0, 504.0, 315.0, 504.0, 315.0, 567.0, 284.0,
+                                567.0, 284.0, 598.0, 252.0, 598.0, 252.0, 630.0, 189.0, 630.0, 189.0, 630.0,
+                                94.5,  630.0, 94.5,  567.0, 31.5,  567.0, 31.5,  472.0, 0.0,   472.0, 0.0,
+                                346.0, 0.0,   346.0, 0.0,   252.0, 31.5,  252.0, 31.5,  189.0, 94.5 };
+
+  std::map<char, std::vector<double>> my_map;
+
+  my_map['S'] = poses;
+
+  double dx = my_map['S'][iter * 2] * 0.005 - curr_pose.position.x;
+  double dy = my_map['S'][iter * 2 + 1] * 0.005 - curr_pose.position.y;
   double distance = std::hypot(dx, dy);
 
   if (distance < 0.1)

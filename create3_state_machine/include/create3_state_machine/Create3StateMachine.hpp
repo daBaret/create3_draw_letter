@@ -6,6 +6,8 @@
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 
+#include "create3_state_machine_msgs/srv/string.hpp"
+
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 
@@ -37,6 +39,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
 
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr points_pub_;
+  rclcpp::Service<create3_state_machine_msgs::srv::String>::SharedPtr word_srv_;
 
   double kp_;
   int iter = 0;
@@ -51,6 +54,9 @@ private:
   void odom_callback(const nav_msgs::msg::Odometry& msg);
 
   void send_goal_undock();
+
+  void word_srv_callback(const std::shared_ptr<create3_state_machine_msgs::srv::String::Request> request,
+                         std::shared_ptr<create3_state_machine_msgs::srv::String::Response> response);
 
   geometry_msgs::msg::Twist compute_twist(geometry_msgs::msg::Pose, rclcpp::Time time);
 };

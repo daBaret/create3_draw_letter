@@ -12,6 +12,8 @@ find_package(irobot_create_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(create3_state_machine_msgs REQUIRED)
 
 set(dependencies
   rclcpp
@@ -19,6 +21,7 @@ set(dependencies
   irobot_create_msgs
   geometry_msgs
   nav_msgs
+  create3_state_machine_msgs
 )
 
 
