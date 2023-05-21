@@ -2,8 +2,7 @@
 
 namespace create3_state_machine
 {
-Create3StateMachine::Create3StateMachine(const std::string& name)
-  : Node(name), goal_reached(true), kp_(1.5)
+Create3StateMachine::Create3StateMachine(const std::string& name) : Node(name), goal_reached(true), kp_(1.5)
 {
   this->undock_client_ptr_ = rclcpp_action::create_client<UndockAction>(this, "undock");
 
@@ -15,6 +14,17 @@ Create3StateMachine::Create3StateMachine(const std::string& name)
   twist_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
   points_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/points_test", 10);
+
+  // for(int i = 0; i < 6; ++i){
+  //   geometry_msgs::msg::PoseStamped msg;
+  //   msg.header.frame_id = "odom";
+  //   msg.pose.position.x = poses[i*2] * 0.005;
+  //   msg.pose.position.y = poses[i*2 + 1] * 0.005;
+  //   msg.pose.orientation.w = 1;
+  //   points_pub_->publish(msg);
+
+  //   rclcpp::sleep_for(std::chrono::seconds(2));
+  // }
 
   send_goal_undock();
 }
@@ -34,22 +44,26 @@ void Create3StateMachine::odom_callback(const nav_msgs::msg::Odometry& msg)
     geometry_msgs::msg::Twist twist_msg;
     twist_msg = compute_twist(msg.pose.pose, this->now());
     twist_pub_->publish(twist_msg);
-    
   }
 }
 
 geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg::Pose curr_pose, rclcpp::Time time)
 {
-  double dx = goal_pose_.position.x - curr_pose.position.x;
-  double dy = goal_pose_.position.y - curr_pose.position.y;
+  double poses[] = {630.0, 567.0, 567.0, 630.0, 567.0, 630.0, 472.0, 662.0, 472.0, 662.0, 346.0, 662.0, 346.0, 662.0, 252.0, 630.0, 252.0, 630.0, 189.0, 567.0, 189.0, 567.0, 189.0, 504.0, 189.0, 504.0, 220.0, 441.0, 220.0, 441.0, 252.0, 410.0, 252.0, 410.0, 315.0, 378.0, 315.0, 378.0, 504.0, 315.0, 504.0, 315.0, 567.0, 284.0, 567.0, 284.0, 598.0, 252.0, 598.0, 252.0, 630.0, 189.0, 630.0, 189.0, 630.0, 94.5, 630.0, 94.5, 567.0, 31.5, 567.0, 31.5, 472.0, 0.0, 472.0, 0.0, 346.0, 0.0, 346.0, 0.0, 252.0, 31.5, 252.0, 31.5, 189.0, 94.5};
+  double dx = poses[iter * 2] * 0.005 - curr_pose.position.x;
+  double dy = poses[iter * 2 + 1] * 0.005  - curr_pose.position.y;
   double distance = std::hypot(dx, dy);
 
   if (distance < 0.1)
   {
-    geometry_msgs::msg::Twist cmd_vel;
-    cmd_vel.linear.x = 0.0;
-    cmd_vel.angular.z = 0.0;
-    goal_reached = true;
+    ++iter;
+    if (iter >= 38)
+    {
+      geometry_msgs::msg::Twist cmd_vel;
+      cmd_vel.linear.x = 0.0;
+      cmd_vel.angular.z = 0.0;
+      goal_reached = true;
+    }
   }
 
   double target_angle = std::atan2(dy, dx);
@@ -72,7 +86,8 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
   double angular_velocity = kp_ * error;
 
   geometry_msgs::msg::Twist cmd_vel;
-  if(abs(error) < 0.05) cmd_vel.linear.x = 0.5;
+  if (abs(error) < 0.05)
+    cmd_vel.linear.x = 0.5;
   cmd_vel.angular.z = angular_velocity;
 
   return cmd_vel;

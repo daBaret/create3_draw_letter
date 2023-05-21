@@ -39,6 +39,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr points_pub_;
 
   double kp_;
+  int iter = 0;
 
   rclcpp::Time prev_time;
 
