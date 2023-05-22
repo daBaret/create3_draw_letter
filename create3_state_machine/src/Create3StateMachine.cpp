@@ -43,7 +43,7 @@ void Create3StateMachine::word_srv_callback(
   }
   else
   {
-    response->result = "Sadly requested letters are not implemented. Available: S";
+    response->result = "Sadly requested letters are not implemented. Available: SEVN";
   }
 }
 

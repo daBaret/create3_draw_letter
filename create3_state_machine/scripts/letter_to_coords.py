@@ -14,7 +14,7 @@ def svg_path_to_coordinates(svg_path):
 
     return coordinates
 
-svg_path = 'e.svg'
+svg_path = 'v.svg'
 
 coordinates = svg_path_to_coordinates(svg_path)
 
