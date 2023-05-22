@@ -33,7 +33,7 @@ void Create3StateMachine::word_srv_callback(
   bool letter_exists = true;
   for (char& letter : request->word)
   {
-    letter_exists &= (letter == 'S' || letter == 'E') ? true : false;
+    letter_exists &= (letters.find(letter) == letters.end()) ? false : true;
   }
   if (letter_exists)
   {
@@ -147,12 +147,14 @@ void Create3StateMachine::send_goal_dock()
 
   auto dock_options = rclcpp_action::Client<DockAction>::SendGoalOptions();
   dock_options.result_callback = std::bind(&Create3StateMachine::result_dock_callback, this, _1);
+  dock_options.goal_response_callback = std::bind(&Create3StateMachine::goal_dock_response_callback, this, _1);
   auto dock_msg = DockAction::Goal();
 
   this->dock_client_ptr_->async_send_goal(dock_msg, dock_options);
 }
 
-void Create3StateMachine::result_undock_callback(const rclcpp_action::ClientGoalHandle<UndockAction>::WrappedResult& result)
+void Create3StateMachine::result_undock_callback(
+    const rclcpp_action::ClientGoalHandle<UndockAction>::WrappedResult& result)
 {
   switch (result.code)
   {
@@ -166,6 +168,21 @@ void Create3StateMachine::result_undock_callback(const rclcpp_action::ClientGoal
   }
 }
 
+void Create3StateMachine::goal_dock_response_callback(std::shared_future<rclcpp_action::ClientGoalHandle<DockAction>::SharedPtr> future)
+{
+  auto goal_handle = future.get();
+  if (!goal_handle)
+  {
+    RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server, trying again...");
+    current_state_ = State::DOCK;
+  }
+  else
+  {
+    RCLCPP_INFO(this->get_logger(), "Docking goal was accepted!");
+    current_state_ = State::DOCK_WAIT;
+  }
+}
+
 void Create3StateMachine::result_dock_callback(const rclcpp_action::ClientGoalHandle<DockAction>::WrappedResult& result)
 {
   switch (result.code)
@@ -175,7 +192,7 @@ void Create3StateMachine::result_dock_callback(const rclcpp_action::ClientGoalHa
       current_state_ = State::IDLE;
       break;
     default:
-      RCLCPP_ERROR(this->get_logger(), "Undocking Failed...");
+      RCLCPP_ERROR(this->get_logger(), "Docking Failed...");
       return;
   }
 }
@@ -194,16 +211,19 @@ void Create3StateMachine::state_machine()
     case State::DOCK:
       RCLCPP_INFO_STREAM(this->get_logger(), "Docking....");
       send_goal_dock();
-      current_state_ = State::DOCK_WAIT;
+      word_iter_ = 0;
       break;
     case State::DOCK_WAIT:
       RCLCPP_INFO_STREAM(this->get_logger(), "Docking....");
+      break;
+    case State::GO_TO_DOCK_WAIT:
+      RCLCPP_INFO_STREAM(this->get_logger(), "Going to dock....");
       break;
     case State::GO_TO_DOCK:
       RCLCPP_INFO_STREAM(this->get_logger(), "Going to dock....");
       curr_letter = '!';
       goal_reached = false;
-      current_state_ = State::DOCK;
+      current_state_ = State::GO_TO_DOCK_WAIT;
       break;
     case State::NEXT_LETTER_WAIT:
       RCLCPP_INFO_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 4000, "Waiting for letter to finish");

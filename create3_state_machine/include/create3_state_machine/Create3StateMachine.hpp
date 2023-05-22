@@ -85,6 +85,7 @@ private:
 
   void result_undock_callback(const rclcpp_action::ClientGoalHandle<UndockAction>::WrappedResult& result);
   void result_dock_callback(const rclcpp_action::ClientGoalHandle<DockAction>::WrappedResult& result);
+  void goal_dock_response_callback(std::shared_future<rclcpp_action::ClientGoalHandle<DockAction>::SharedPtr> future);
 
   void state_machine();
 
