@@ -67,6 +67,10 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
 {
   double dx, dy, distance;
 
+  double scale = 0.001;
+  double y_offset = (letter_size * word_iter_ - letter_size * word_to_draw_.size() / 2) * scale;
+  double x_offset = 2;
+
   if (curr_letter == '!')
   {
     dx = letters[curr_letter][iter * 2] - curr_pose.position.x;
@@ -75,8 +79,8 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
   }
   else
   {
-    dx = letters[curr_letter][iter * 2] * 0.001 - 2 - curr_pose.position.x;
-    dy = letters[curr_letter][iter * 2 + 1] * 0.001 - curr_pose.position.y;
+    dx = letters[curr_letter][iter * 2] * scale- x_offset - curr_pose.position.x;
+    dy = letters[curr_letter][iter * 2 + 1] * scale + y_offset - curr_pose.position.y;
     distance = std::hypot(dx, dy);
   }
 
@@ -168,7 +172,8 @@ void Create3StateMachine::result_undock_callback(
   }
 }
 
-void Create3StateMachine::goal_dock_response_callback(std::shared_future<rclcpp_action::ClientGoalHandle<DockAction>::SharedPtr> future)
+void Create3StateMachine::goal_dock_response_callback(
+    std::shared_future<rclcpp_action::ClientGoalHandle<DockAction>::SharedPtr> future)
 {
   auto goal_handle = future.get();
   if (!goal_handle)
