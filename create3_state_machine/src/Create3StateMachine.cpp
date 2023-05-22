@@ -4,7 +4,7 @@
 namespace create3_state_machine
 {
 Create3StateMachine::Create3StateMachine(const std::string& name)
-  : Node(name), goal_reached(true), kp_(1.5), current_state_(State::IDLE)
+  : Node(name), goal_reached(true), kp_(2), current_state_(State::IDLE)
 {
   this->undock_client_ptr_ = rclcpp_action::create_client<UndockAction>(this, "undock");
   this->dock_client_ptr_ = rclcpp_action::create_client<DockAction>(this, "dock");
@@ -16,7 +16,7 @@ Create3StateMachine::Create3StateMachine(const std::string& name)
 
   twist_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-  points_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/points_test", 10);
+  points_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/points_test", 10);
 
   word_srv_ = this->create_service<create3_state_machine_msgs::srv::String>(
       "input_word", std::bind(&Create3StateMachine::word_srv_callback, this, _1, _2));
@@ -68,7 +68,7 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
   double dx, dy, distance;
 
   double scale = 0.001;
-  double y_offset = (letter_size * word_iter_ - letter_size * word_to_draw_.size() / 2) * scale;
+  double y_offset = (letter_size * word_iter_ - letter_size * word_to_draw_.size() / 2 - letter_size) * scale;
   double x_offset = 2;
 
   if (curr_letter == '!')
@@ -79,12 +79,12 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
   }
   else
   {
-    dx = letters[curr_letter][iter * 2] * scale- x_offset - curr_pose.position.x;
+    dx = letters[curr_letter][iter * 2] * scale - x_offset - curr_pose.position.x;
     dy = letters[curr_letter][iter * 2 + 1] * scale + y_offset - curr_pose.position.y;
     distance = std::hypot(dx, dy);
   }
 
-  if (distance < 0.1)
+  if (distance < 0.01)
   {
     ++iter;
     if (iter >= letters[curr_letter].size() / 2)
@@ -119,8 +119,16 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
   double angular_velocity = kp_ * error;
 
   geometry_msgs::msg::Twist cmd_vel;
-  if (abs(error) < 0.05)
+  if (abs(error) < 0.01)
+  {
     cmd_vel.linear.x = 0.5;
+    if(iter != 0 && curr_letter != '!'){
+      poses_msg_.header.frame_id = "odom";
+      poses_msg_.poses.push_back(curr_pose);
+      points_pub_->publish(poses_msg_);
+    }
+  }
+
   cmd_vel.angular.z = angular_velocity;
 
   return cmd_vel;
@@ -208,6 +216,7 @@ void Create3StateMachine::state_machine()
   {
     case State::UNDOCK:
       send_goal_undock();
+      poses_msg_.poses.clear();
       current_state_ = State::UNDOCK_WAIT;
       break;
     case State::UNDOCK_WAIT:

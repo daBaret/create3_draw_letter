@@ -4,6 +4,7 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_array.hpp""
 #include "geometry_msgs/msg/twist.hpp"
 
 #include "create3_state_machine_msgs/srv/string.hpp"
@@ -56,7 +57,7 @@ private:
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
 
-  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr points_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr points_pub_;
   rclcpp::Service<create3_state_machine_msgs::srv::String>::SharedPtr word_srv_;
 
   rclcpp::TimerBase::SharedPtr timer_state_machine_;
@@ -72,6 +73,8 @@ private:
   bool goal_reached;
   int word_iter_ = 0;
   std::string word_to_draw_;
+
+  geometry_msgs::msg::PoseArray poses_msg_;
 
   void goal_pose_callback(const geometry_msgs::msg::PoseStamped& msg);
 
