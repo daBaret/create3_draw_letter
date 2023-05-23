@@ -12,3 +12,6 @@ In another terminal call the service to start the mission:
 ros2 service call /input_word create3_state_machine_msgs/srv/String word:\ \'N\'\
 ```
 The available letters are **SEVN**.
+
+## Videos
+The videos can be found in the videos folder.
