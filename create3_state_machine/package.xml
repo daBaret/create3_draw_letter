@@ -3,9 +3,9 @@
 <package format="3">
   <name>create3_state_machine</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="dbaret@ethz.ch">davide</maintainer>
-  <license>TODO: License declaration</license>
+  <description>This package containts a simple state machine and ables to command the robot to drive and draw a letter.</description>
+  <maintainer email="dbaret@ethz.ch">Davide Baret</maintainer>
+  <license>ToDo</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -18,7 +18,14 @@
 
   <member_of_group>rosidl_interface_packages</member_of_group>
 
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>irobot_create_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>create3_state_machine_msgs</depend>
+  <depend>irobot_create_gazebo_bringup</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
