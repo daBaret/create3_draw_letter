@@ -16,11 +16,12 @@ from launch_ros.actions import PushRosNamespace
 
 def generate_launch_description():
 
-    create_bringup = get_package_share_directory('create3_state_machine')
+    create3_state_machine_path = get_package_share_directory(
+        'create3_state_machine')
 
     # Rviz
     rviz_config = PathJoinSubstitution(
-        [create_bringup, 'rviz', 'create3_state_machine.rviz'])
+        [create3_state_machine_path, 'rviz', 'create3_state_machine.rviz'])
 
     rviz = Node(
         package='rviz2',
@@ -38,11 +39,11 @@ def generate_launch_description():
                           'use_gazebo_gui': 'false'}.items()
 
     )
-
     create3_state_machine_node = Node(
         package='create3_state_machine',
         executable='create3_state_machine',
-        name='create3_state_machine'
+        name='create3_state_machine',
+        output='screen'
     )
 
     return LaunchDescription([

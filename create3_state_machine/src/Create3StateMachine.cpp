@@ -3,20 +3,17 @@
 
 namespace create3_state_machine
 {
-Create3StateMachine::Create3StateMachine(const std::string& name)
-  : Node(name), goal_reached(true), kp_(2), current_state_(State::IDLE)
+Create3StateMachine::Create3StateMachine(const std::string& name) : Node(name), current_state_(State::IDLE), kp_(2)
 {
   this->undock_client_ptr_ = rclcpp_action::create_client<UndockAction>(this, "undock");
   this->dock_client_ptr_ = rclcpp_action::create_client<DockAction>(this, "dock");
 
-  goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-      "/goal_pose", 10, std::bind(&Create3StateMachine::goal_pose_callback, this, _1));
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "/odom", 10, std::bind(&Create3StateMachine::odom_callback, this, _1));
 
   twist_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-  points_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/points_test", 10);
+  points_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/points_out", 10);
 
   word_srv_ = this->create_service<create3_state_machine_msgs::srv::String>(
       "input_word", std::bind(&Create3StateMachine::word_srv_callback, this, _1, _2));
@@ -47,12 +44,6 @@ void Create3StateMachine::word_srv_callback(
   }
 }
 
-void Create3StateMachine::goal_pose_callback(const geometry_msgs::msg::PoseStamped& msg)
-{
-  goal_pose_ = msg.pose;
-  goal_reached = false;
-}
-
 void Create3StateMachine::odom_callback(const nav_msgs::msg::Odometry& msg)
 {
   if (!goal_reached)
@@ -71,29 +62,29 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
   double y_offset = (letter_size * word_iter_ - letter_size * word_to_draw_.size() / 2 - letter_size) * scale;
   double x_offset = 2;
 
-  if (curr_letter == '!')
+  if (curr_letter_ == '!')
   {
-    dx = letters[curr_letter][iter * 2] - curr_pose.position.x;
-    dy = letters[curr_letter][iter * 2 + 1] - curr_pose.position.y;
+    dx = letters[curr_letter_][path_iter_ * 2] - curr_pose.position.x;
+    dy = letters[curr_letter_][path_iter_ * 2 + 1] - curr_pose.position.y;
     distance = std::hypot(dx, dy);
   }
   else
   {
-    dx = letters[curr_letter][iter * 2] * scale - x_offset - curr_pose.position.x;
-    dy = letters[curr_letter][iter * 2 + 1] * scale + y_offset - curr_pose.position.y;
+    dx = letters[curr_letter_][path_iter_ * 2] * scale - x_offset - curr_pose.position.x;
+    dy = letters[curr_letter_][path_iter_ * 2 + 1] * scale + y_offset - curr_pose.position.y;
     distance = std::hypot(dx, dy);
   }
 
   if (distance < 0.01)
   {
-    ++iter;
-    if (iter >= letters[curr_letter].size() / 2)
+    ++path_iter_;
+    if (path_iter_ >= letters[curr_letter_].size() / 2)
     {
       geometry_msgs::msg::Twist cmd_vel;
       cmd_vel.linear.x = 0.0;
       cmd_vel.angular.z = 0.0;
       goal_reached = true;
-      iter = 0;
+      path_iter_ = 0;
       current_state_ = (current_state_ == State::NEXT_LETTER_WAIT) ? State::NEXT_LETTER : State::DOCK;
       return cmd_vel;
     }
@@ -122,7 +113,8 @@ geometry_msgs::msg::Twist Create3StateMachine::compute_twist(geometry_msgs::msg:
   if (abs(error) < 0.01)
   {
     cmd_vel.linear.x = 0.5;
-    if(iter != 0 && curr_letter != '!'){
+    if (path_iter_ != 0 && curr_letter_ != '!')
+    {
       poses_msg_.header.frame_id = "odom";
       poses_msg_.poses.push_back(curr_pose);
       points_pub_->publish(poses_msg_);
@@ -235,7 +227,7 @@ void Create3StateMachine::state_machine()
       break;
     case State::GO_TO_DOCK:
       RCLCPP_INFO_STREAM(this->get_logger(), "Going to dock....");
-      curr_letter = '!';
+      curr_letter_ = '!';
       goal_reached = false;
       current_state_ = State::GO_TO_DOCK_WAIT;
       break;
@@ -249,7 +241,7 @@ void Create3StateMachine::state_machine()
       {
         RCLCPP_INFO_STREAM(this->get_logger(), "Writing next letter....");
         goal_reached = false;
-        curr_letter = word_to_draw_[word_iter_];
+        curr_letter_ = word_to_draw_[word_iter_];
         ++word_iter_;
         current_state_ = State::NEXT_LETTER_WAIT;
       }
@@ -258,6 +250,5 @@ void Create3StateMachine::state_machine()
     default:
       break;
   }
-
-}  // namespace create3_state_machine
+}
 }  // namespace create3_state_machine
